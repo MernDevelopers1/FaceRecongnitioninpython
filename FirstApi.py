@@ -11,9 +11,6 @@ def find_face_encodings(image_bytes):
 compare_faces_bp = Blueprint('compare_faces', __name__)  
 @compare_faces_bp.route('/compare_faces', methods=['POST'])
 def compare_faces():
-    print("Called!!")
-
-
     if 'image1' not in request.files or 'image2' not in request.files:
         return jsonify({'error': 'Missing required fields: image1 and image2'}), 400
 
