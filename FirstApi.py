@@ -22,6 +22,15 @@ def fallback_to_deepface(image1_bytes, image2_bytes):
 
     try:
         result = DeepFace.verify(image1, image2, enforce_detection=False)
+        if (result['verified'] and result['distance'] > 0.6):
+            return {
+                    "match": str(False),
+                    "distance": result['distance'],
+                    "face_match": (1 - result['distance']) * 100,
+                    "msg": "Face does not match"
+                }
+
+        
         return {
             "match": str(result['verified']),
             "distance": result['distance'],
@@ -52,9 +61,9 @@ def compare_faces():
             fallback_result = fallback_to_deepface(image1_bytes, image2_bytes)
             if fallback_result:
                 return jsonify({
-                    "num_faces_detected": 0,
+                    "num_faces_detected": 2,
                     "comparison_results": [fallback_result]
-                }), 400
+                }), 200
 
             return jsonify({
                 "num_faces_detected": 0,
@@ -71,7 +80,7 @@ def compare_faces():
         results = []
         for face_encoding1 in face_enc1:
             for face_encoding2 in face_enc2:
-                match = face_recognition.compare_faces([face_encoding2], face_encoding1, tolerance=0.45)[0]
+                match = face_recognition.compare_faces([face_encoding2], face_encoding1, tolerance=0.6)[0]
                 distance = face_recognition.face_distance([face_encoding2], face_encoding1)[0]
 
                 result = {
