@@ -45,26 +45,32 @@ compare_faces_bp = Blueprint('compare_faces', __name__)
 
 @compare_faces_bp.route('/compare_faces', methods=['POST'])
 def compare_faces():
+    print("------------------------------------------------------Recongnition Start-----------------------------------------------------------------------------------")
     if 'image1' not in request.files or 'image2' not in request.files:
         return jsonify({'error': 'Missing required fields: image1 and image2'}), 400
 
     try:
+        print("Images Founded!")
         image1_bytes = request.files['image1'].read()
         image2_bytes = request.files['image2'].read()
 
         # Convert images to grayscale before processing
         face_enc1 = find_face_encodings(image1_bytes, model='large', grayscale=True)
         face_enc2 = find_face_encodings(image2_bytes, model='large', grayscale=True)
-
+        print("Converted to Gray Scale!")
         # Fall back to DeepFace if no face is detected
         if face_enc1 is None or face_enc2 is None:
+            print("FaceDid Not Founded!")
             fallback_result = fallback_to_deepface(image1_bytes, image2_bytes)
             if fallback_result:
+                print(fallback_result)
+                print("-----------------------------------------------------------Recongniton Compelted-----------------------------------------------------------------------------------")
                 return jsonify({
                     "num_faces_detected": 2,
                     "comparison_results": [fallback_result]
                 }), 200
-
+            print(fallback_result)
+            print("-----------------------------------------------------------Recongniton Compelted-----------------------------------------------------------------------------------")
             return jsonify({
                 "num_faces_detected": 0,
                 "comparison_results": [
@@ -90,7 +96,8 @@ def compare_faces():
                     "msg": "Face Matched" if match else "Face does not match"
                 }
                 results.append(result)
-
+        print(result)
+        print("-----------------------------------------------------------Recongniton Compelted-----------------------------------------------------------------------------------")
         return jsonify({
             "num_faces_detected": len(face_enc1),
             "comparison_results": results
@@ -98,4 +105,5 @@ def compare_faces():
 
     except Exception as e:
         print(f"Error: {e}")
+        print("-----------------------------------------------------------Recongniton Error Occure-----------------------------------------------------------------------------------")
         return jsonify({'error': "Error occurred during face comparison!"}), 500
