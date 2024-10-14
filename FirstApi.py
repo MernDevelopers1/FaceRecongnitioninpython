@@ -55,12 +55,12 @@ compare_faces_bp = Blueprint('compare_faces', __name__)
 
 @compare_faces_bp.route('/compare_faces', methods=['POST'])
 def compare_faces():
-    print("------------------------------------------------------Recongnition Start-----------------------------------------------------------------------------------")
+    print("Recognition Start")
     if 'image1' not in request.files or 'image2' not in request.files:
         return jsonify({'error': 'Missing required fields: image1 and image2'}), 400
 
     try:
-        print("Images Founded!")
+        print("Images Found!")
         image1_bytes = request.files['image1'].read()
         image2_bytes = request.files['image2'].read()
 
@@ -79,8 +79,7 @@ def compare_faces():
                     "num_faces_detected": 2,
                     "comparison_results": [fallback_result]
                 }), 200
-            print(fallback_result)
-            print("-----------------------------------------------------------Recongniton Compelted-----------------------------------------------------------------------------------")
+
             return jsonify({
                 "num_faces_detected": 0,
                 "comparison_results": [
@@ -118,5 +117,4 @@ def compare_faces():
 
     except Exception as e:
         print(f"Error: {e}")
-        print("-----------------------------------------------------------Recongniton Error Occure-----------------------------------------------------------------------------------")
         return jsonify({'error': "Error occurred during face comparison!"}), 500
