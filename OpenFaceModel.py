@@ -12,7 +12,7 @@ def fallback_to_deepface(image1_bytes, image2_bytes):
 
     try:
         
-        result = DeepFace.verify(image1, image2, model_name="OpenFace", enforce_detection=False)
+        result = DeepFace.verify(image1, image2, model_name="Facenet", enforce_detection=False)
         distance = result['distance']
         face_match_percentage = (1 - distance) * 100
         match = distance < 0.6  
