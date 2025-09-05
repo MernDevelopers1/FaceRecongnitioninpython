@@ -62,7 +62,7 @@ def compare_with_deepface(image1_bytes, image2_bytes):
                 face_match_percentage = (1 - distance) * 100
                 match = distance < 0.6
 
-                results.append({
+                record = {
                     "library": "DeepFace",
                     "model": model,
                     "variation": var_name,
@@ -70,15 +70,20 @@ def compare_with_deepface(image1_bytes, image2_bytes):
                     "distance": distance,
                     "face_match": face_match_percentage,
                     "msg": "Face Matched" if match else "Face does not match"
-                })
+                }
+
+                print(f"[DeepFace][{model}][{var_name}] → {record}")
+                results.append(record)
 
             except Exception as e:
-                results.append({
+                error_record = {
                     "library": "DeepFace",
                     "model": model,
                     "variation": var_name,
                     "error": str(e)
-                })
+                }
+                print(f"[DeepFace][{model}][{var_name}] ERROR → {e}")
+                results.append(error_record)
     return results
 
 
@@ -99,7 +104,7 @@ def compare_with_face_recognition(image1_bytes, image2_bytes):
                 face_match_percentage = (1 - distance) * 100
                 match = distance < 0.6
 
-                results.append({
+                record = {
                     "library": "face_recognition",
                     "model": "dlib",
                     "variation": var_name,
@@ -107,9 +112,13 @@ def compare_with_face_recognition(image1_bytes, image2_bytes):
                     "distance": float(distance),
                     "face_match": face_match_percentage,
                     "msg": "Face Matched" if match else "Face does not match"
-                })
+                }
+
+                print(f"[face_recognition][dlib][{var_name}] → {record}")
+                results.append(record)
+
             else:
-                results.append({
+                no_face_record = {
                     "library": "face_recognition",
                     "model": "dlib",
                     "variation": var_name,
@@ -117,14 +126,20 @@ def compare_with_face_recognition(image1_bytes, image2_bytes):
                     "distance": 0,
                     "face_match": 0,
                     "msg": "No face detected"
-                })
+                }
+                print(f"[face_recognition][dlib][{var_name}] → No face detected")
+                results.append(no_face_record)
+
         except Exception as e:
-            results.append({
+            error_record = {
                 "library": "face_recognition",
                 "model": "dlib",
                 "variation": var_name,
                 "error": str(e)
-            })
+            }
+            print(f"[face_recognition][dlib][{var_name}] ERROR → {e}")
+            results.append(error_record)
+
     return results
 
 
