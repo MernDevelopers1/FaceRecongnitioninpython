@@ -11,7 +11,7 @@ from OpenFaceModel import compare_faces6_bp
 from TestingCode import compare_faces_bp7
 import dlib
 import tensorflow as tf
-
+from flask_cors import CORS
 print("=== GPU CHECK ===")
 print("dlib CUDA enabled:", dlib.DLIB_USE_CUDA)
 print("dlib GPU devices:", dlib.cuda.get_num_devices())
@@ -19,7 +19,7 @@ print("TensorFlow GPUs:", tf.config.list_physical_devices('GPU'))
 print("=================")
 
 app = Flask(__name__)
-
+CORS(app, resources={r"/*": {"origins": "*"}})  # allow all origins
 # app.register_blueprint(compare_faces_bp, url_prefix='/', methods=['POST'])
 app.register_blueprint(compare_faces6_bp, url_prefix='/', methods=['POST'])
 app.register_blueprint(compare_faces_bp, url_prefix='/', methods=['POST'])

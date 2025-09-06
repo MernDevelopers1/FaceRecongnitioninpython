@@ -8,15 +8,42 @@ compare_faces_bp7 = Blueprint("compare_faces_all", __name__)
 
 # DeepFace supported models
 DEEPFACE_MODELS = [
-    "VGG-Face", "Facenet", "Facenet512",
-    "OpenFace", "DeepFace", "DeepID",
-    "Dlib", "ArcFace", "SFace"
+    # "VGG-Face",
+     "Facenet", 
+    #  "Facenet512",
+    # "OpenFace", 
+    # "DeepFace",
+    #  "DeepID",
+    # "Dlib", "ArcFace", "SFace"
 ]
 
-# Preprocessing variations
-def preprocess_variations(image_bytes):
-    """Return multiple preprocessing variations of the same image."""
+# ======================
+# Face detection utility
+# ======================
+def detect_faces(image_bytes):
+    """Return face locations and cropped face images for comparison."""
     img = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
+    rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+    face_locations = face_recognition.face_locations(rgb)  # list of (top, right, bottom, left)
+    faces = []
+
+    for i, (top, right, bottom, left) in enumerate(face_locations):
+        cropped = img[top:bottom, left:right]
+        faces.append({
+            "id": f"person_{i+1}",
+            "location": {"top": top, "right": right, "bottom": bottom, "left": left},
+            "image": cropped
+        })
+
+    return faces
+
+
+# ======================
+# Preprocessing variations
+# ======================
+def preprocess_variations(img):
+    """Return multiple preprocessing variations of the same face image."""
     variations = {}
 
     # Original
@@ -43,15 +70,17 @@ def preprocess_variations(image_bytes):
     return variations
 
 
-def compare_with_deepface(image1_bytes, image2_bytes):
-    """Compare using all DeepFace models and all preprocessing variations."""
+# ======================
+# Comparisons
+# ======================
+def compare_with_deepface(face1, face2):
     results = []
-    img1_variations = preprocess_variations(image1_bytes)
-    img2_variations = preprocess_variations(image2_bytes)
+    img1_variations = preprocess_variations(face1)
+    img2_variations = preprocess_variations(face2)
 
     for model in DEEPFACE_MODELS:
         for var_name, img1 in img1_variations.items():
-            img2 = img2_variations[var_name]  # same variation for both
+            img2 = img2_variations[var_name]
             try:
                 result = DeepFace.verify(
                     img1, img2,
@@ -76,22 +105,20 @@ def compare_with_deepface(image1_bytes, image2_bytes):
                 results.append(record)
 
             except Exception as e:
-                error_record = {
+                print(f"[DeepFace][{model}][{var_name}] ERROR → {e}")
+                results.append({
                     "library": "DeepFace",
                     "model": model,
                     "variation": var_name,
                     "error": str(e)
-                }
-                print(f"[DeepFace][{model}][{var_name}] ERROR → {e}")
-                results.append(error_record)
+                })
     return results
 
 
-def compare_with_face_recognition(image1_bytes, image2_bytes):
-    """Compare using face_recognition with preprocessing variations."""
+def compare_with_face_recognition(face1, face2):
     results = []
-    img1_variations = preprocess_variations(image1_bytes)
-    img2_variations = preprocess_variations(image2_bytes)
+    img1_variations = preprocess_variations(face1)
+    img2_variations = preprocess_variations(face2)
 
     for var_name, img1 in img1_variations.items():
         img2 = img2_variations[var_name]
@@ -116,9 +143,8 @@ def compare_with_face_recognition(image1_bytes, image2_bytes):
 
                 print(f"[face_recognition][dlib][{var_name}] → {record}")
                 results.append(record)
-
             else:
-                no_face_record = {
+                results.append({
                     "library": "face_recognition",
                     "model": "dlib",
                     "variation": var_name,
@@ -126,25 +152,24 @@ def compare_with_face_recognition(image1_bytes, image2_bytes):
                     "distance": 0,
                     "face_match": 0,
                     "msg": "No face detected"
-                }
-                print(f"[face_recognition][dlib][{var_name}] → No face detected")
-                results.append(no_face_record)
-
+                })
         except Exception as e:
-            error_record = {
+            print(f"[face_recognition][dlib][{var_name}] ERROR → {e}")
+            results.append({
                 "library": "face_recognition",
                 "model": "dlib",
                 "variation": var_name,
                 "error": str(e)
-            }
-            print(f"[face_recognition][dlib][{var_name}] ERROR → {e}")
-            results.append(error_record)
-
+            })
     return results
 
 
+# ======================
+# Flask Route
+# ======================
 @compare_faces_bp7.route("/compare_faces_all", methods=["POST"])
 def compare_faces_all():
+    # return {"message": "CORS fixed!"}
     if "image1" not in request.files or "image2" not in request.files:
         return jsonify({"error": "Missing required fields: image1 and image2"}), 400
 
@@ -152,23 +177,34 @@ def compare_faces_all():
         image1_bytes = request.files["image1"].read()
         image2_bytes = request.files["image2"].read()
 
-        # Run both DeepFace and face_recognition
-        deepface_results = compare_with_deepface(image1_bytes, image2_bytes)
-        fr_results = compare_with_face_recognition(image1_bytes, image2_bytes)
+        # Detect faces
+        faces1 = detect_faces(image1_bytes)
+        faces2 = detect_faces(image2_bytes)
 
-        all_results = deepface_results + fr_results
+        all_comparisons = []
 
-        # Sort by best face match %
-        sorted_results = sorted(
-            all_results,
-            key=lambda x: x.get("face_match", 0),
-            reverse=True
-        )
+        for f1 in faces1:
+            for f2 in faces2:
+                deepface_results = compare_with_deepface(f1["image"], f2["image"])
+                fr_results = compare_with_face_recognition(f1["image"], f2["image"])
+                combined = deepface_results + fr_results
+
+                # Sort by best match
+                sorted_results = sorted(combined, key=lambda x: x.get("face_match", 0), reverse=True)
+
+                all_comparisons.append({
+                    "face1_id": f1["id"],
+                    "face1_location": f1["location"],
+                    "face2_id": f2["id"],
+                    "face2_location": f2["location"],
+                    "best_result": sorted_results[0] if sorted_results else {},
+                    "all_results": sorted_results
+                })
 
         return jsonify({
-            "num_faces_detected": 2,
-            "best_result": sorted_results[0] if sorted_results else {},
-            "all_results": sorted_results
+            "faces_in_image1": len(faces1),
+            "faces_in_image2": len(faces2),
+            "comparisons": all_comparisons
         }), 200
 
     except Exception as e:
