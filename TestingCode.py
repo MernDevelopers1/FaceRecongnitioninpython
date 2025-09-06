@@ -75,43 +75,41 @@ def preprocess_variations(img):
 # ======================
 def compare_with_deepface(face1, face2):
     results = []
-    img1_variations = preprocess_variations(face1)
-    img2_variations = preprocess_variations(face2)
 
-    for model in DEEPFACE_MODELS:
-        for var_name, img1 in img1_variations.items():
-            img2 = img2_variations[var_name]
-            try:
-                result = DeepFace.verify(
-                    img1, img2,
-                    model_name=model,
-                    enforce_detection=False
-                )
-                distance = result["distance"]
-                face_match_percentage = (1 - distance) * 100
-                match = distance < 0.6
+    # Only original faces (no variations)
+    try:
+        for model in DEEPFACE_MODELS:
+            result = DeepFace.verify(
+                face1, face2,
+                model_name=model,
+                enforce_detection=False
+            )
+            distance = result["distance"]
+            face_match_percentage = (1 - distance) * 100
+            match = distance < 0.6
 
-                record = {
-                    "library": "DeepFace",
-                    "model": model,
-                    "variation": var_name,
-                    "match": str(match),
-                    "distance": distance,
-                    "face_match": face_match_percentage,
-                    "msg": "Face Matched" if match else "Face does not match"
-                }
+            record = {
+                "library": "DeepFace",
+                "model": model,
+                "variation": "original",   # always original
+                "match": str(match),
+                "distance": distance,
+                "face_match": face_match_percentage,
+                "msg": "Face Matched" if match else "Face does not match"
+            }
 
-                print(f"[DeepFace][{model}][{var_name}] → {record}")
-                results.append(record)
+            print(f"[DeepFace][{model}][original] → {record}")
+            results.append(record)
 
-            except Exception as e:
-                print(f"[DeepFace][{model}][{var_name}] ERROR → {e}")
-                results.append({
-                    "library": "DeepFace",
-                    "model": model,
-                    "variation": var_name,
-                    "error": str(e)
-                })
+    except Exception as e:
+        print(f"[DeepFace][ERROR] → {e}")
+        results.append({
+            "library": "DeepFace",
+            "model": model,
+            "variation": "original",
+            "error": str(e)
+        })
+
     return results
 
 
