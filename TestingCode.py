@@ -9,8 +9,8 @@ compare_faces_bp7 = Blueprint("compare_faces_all", __name__)
 # DeepFace supported models
 DEEPFACE_MODELS = [
     # "VGG-Face",
-     "Facenet", 
-    #  "Facenet512",
+    #  "Facenet", 
+     "Facenet512",
     # "OpenFace", 
     # "DeepFace",
     #  "DeepID",
@@ -75,12 +75,16 @@ def preprocess_variations(img):
 # ======================
 def compare_with_deepface(face1, face2):
     results = []
-
-    # Only original faces (no variations)
     try:
+        # Convert from BGR (OpenCV) to RGB (DeepFace expects RGB)
+        face1_rgb = cv2.cvtColor(face1, cv2.COLOR_BGR2RGB)
+        face2_rgb = cv2.cvtColor(face2, cv2.COLOR_BGR2RGB)
+
+        
+
         for model in DEEPFACE_MODELS:
             result = DeepFace.verify(
-                face1, face2,
+                face1_rgb, face2_rgb,
                 model_name=model,
                 enforce_detection=False
             )
@@ -91,7 +95,7 @@ def compare_with_deepface(face1, face2):
             record = {
                 "library": "DeepFace",
                 "model": model,
-                "variation": "original",   # always original
+                "variation": "original",
                 "match": str(match),
                 "distance": distance,
                 "face_match": face_match_percentage,
@@ -111,6 +115,7 @@ def compare_with_deepface(face1, face2):
         })
 
     return results
+
 
 
 def compare_with_face_recognition(face1, face2):
