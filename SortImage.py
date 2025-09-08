@@ -1,66 +1,81 @@
 import os
 import shutil
 import face_recognition
+from PIL import UnidentifiedImageError
 
-# Input and output folders
+# Input + output folders
 INPUT_FOLDER = "/mnt/d/TestImages"
 OUTPUT_FOLDER = "/mnt/d/TestOutput"
+NOT_FOUND_FOLDER = os.path.join(OUTPUT_FOLDER, "face_not_found")
 
-# Create output folders
+# Create folders if not exist
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-FACE_NOT_FOUND_FOLDER = os.path.join(OUTPUT_FOLDER, "face_not_found")
-os.makedirs(FACE_NOT_FOUND_FOLDER, exist_ok=True)
+os.makedirs(NOT_FOUND_FOLDER, exist_ok=True)
 
-# Parameters
-TOLERANCE = 0.6  # smaller = stricter match
+# Store encodings + person folder mapping
+known_faces = []
+known_folders = []
 
-# Keep known encodings
-known_faces = []  # list of (encoding, person_id)
-person_count = 0
 
 def get_face_encoding(img_path):
-    """Return first face encoding in the image (if any)."""
-    img = face_recognition.load_image_file(img_path)
-    encodings = face_recognition.face_encodings(img)
-    if len(encodings) > 0:
-        return encodings[0]
+    """Return first face encoding in the image (if any), with fallback detection."""
+    try:
+        img = face_recognition.load_image_file(img_path)
+
+        # Try CNN first (more accurate)
+        locations = face_recognition.face_locations(img, model="cnn")
+
+        if len(locations) == 0:
+            # Fallback to HOG
+            locations = face_recognition.face_locations(img, model="hog")
+
+        if len(locations) > 0:
+            encodings = face_recognition.face_encodings(img, known_face_locations=locations)
+            if len(encodings) > 0:
+                return encodings[0]
+
+    except UnidentifiedImageError:
+        print(f"[ERROR] Cannot identify file as image → {img_path}")
+    except Exception as e:
+        print(f"[ERROR] Failed to process {img_path} → {e}")
+
     return None
 
-# Loop through all images
-for filename in os.listdir(INPUT_FOLDER):
-    if not filename.lower().endswith((".jpg", ".jpeg", ".png")):
-        continue
 
-    img_path = os.path.join(INPUT_FOLDER, filename)
-    encoding = get_face_encoding(img_path)
+def sort_images():
+    person_count = 0
 
-    if encoding is None:
-        # No face found → move to "face_not_found"
-        dest_path = os.path.join(FACE_NOT_FOUND_FOLDER, filename)
-        shutil.move(img_path, dest_path)  # use shutil.move if you want to move instead of copy
-        print(f"{filename} → face_not_found")
-        continue
+    for filename in os.listdir(INPUT_FOLDER):
+        if not filename.lower().endswith((".jpg", ".jpeg", ".png")):
+            continue
 
-    matched_person_id = None
+        img_path = os.path.join(INPUT_FOLDER, filename)
+        encoding = get_face_encoding(img_path)
 
-    # Compare with known faces
-    for known_encoding, person_id in known_faces:
-        distance = face_recognition.face_distance([known_encoding], encoding)[0]
-        if distance < TOLERANCE:
-            matched_person_id = person_id
-            break
+        if encoding is None:
+            # No face or unreadable → move to face_not_found
+            shutil.move(img_path, os.path.join(NOT_FOUND_FOLDER, filename))
+            print(f"[NO FACE] → {filename}")
+            continue
 
-    # If no match, create new person folder
-    if matched_person_id is None:
-        person_count += 1
-        matched_person_id = f"person_{person_count}"
-        known_faces.append((encoding, matched_person_id))
+        # Compare with known faces
+        matches = face_recognition.compare_faces(known_faces, encoding, tolerance=0.5)
 
-        # Create folder for new person
-        os.makedirs(os.path.join(OUTPUT_FOLDER, matched_person_id), exist_ok=True)
+        if True in matches:
+            match_index = matches.index(True)
+            person_folder = known_folders[match_index]
+        else:
+            # New person → create folder
+            person_count += 1
+            person_folder = os.path.join(OUTPUT_FOLDER, f"person_{person_count}")
+            os.makedirs(person_folder, exist_ok=True)
+            known_faces.append(encoding)
+            known_folders.append(person_folder)
 
-    # Move image into the correct folder
-    dest_path = os.path.join(OUTPUT_FOLDER, matched_person_id, filename)
-    shutil.move(img_path, dest_path)  # use shutil.move if you want to move instead of copy
+        # Move file to that person's folder
+        shutil.move(img_path, os.path.join(person_folder, filename))
+        print(f"[SORTED] {filename} → {person_folder}")
 
-    print(f"{filename} → {matched_person_id}")
+
+if __name__ == "__main__":
+    sort_images()
